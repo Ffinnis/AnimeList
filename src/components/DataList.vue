@@ -14,6 +14,8 @@
         <ul v-if="searchListener === '' && selectedGenre === 'All'" class="anime-list">
           <li v-for="item in animeList" :key="item.id" class="anime-item">
             {{item.titles.en}}
+            <input @change="favouritesHandler" class="favourites-input" v-bind:value="item.titles.en" v-bind:name="item.id" type="checkbox" hidden v-bind:id="item.id">
+            <label class="addFavourites" v-bind:for="item.id">&#9733;</label>
           </li>
         </ul>
         <ul v-else-if="filteredArr.length > 0" class="anime-list">
@@ -26,12 +28,7 @@
         </div>
       </div>
       <div class="right-col">
-        <h2>Избранное</h2>
-        <ul class="favourites_list">
-          <li class="favourites_item">
-            asd
-          </li>
-        </ul>
+        <Favourites />
       </div>
     </div>
   </div>
@@ -39,9 +36,12 @@
 
 <script>
 import axios from 'axios'
-import { onBeforeMount, ref } from 'vue'
+import { computed, onBeforeMount, ref, watch } from 'vue'
+import Favourites from './Favourites'
+import createStore from '../store/index'
 export default {
   name: 'DataList',
+  components: { Favourites },
   setup () {
     const animeList = ref([])
     const searchListener = ref('')
@@ -49,6 +49,8 @@ export default {
     const filteredArr = ref([])
     const genres = ref([])
     const selectedGenre = ref('All')
+    const store = createStore
+    const favouritesList = computed(() => store.getters.getFavouritesList)
 
     onBeforeMount(async () => {
       await axios.get('https://api.aniapi.com/v1/anime', {
@@ -70,25 +72,67 @@ export default {
         })
     })
 
+    const subArr = filteredArr.value
+
     const searchHandler = () => {
-      filteredArr.value = []
-      for (let i = 0; i < itemTitles.value.length; i++) {
-        if (itemTitles.value[i].indexOf(searchListener.value) > -1) {
-          filteredArr.value.push(itemTitles.value[i])
+      if (selectedGenre.value === 'All') {
+        filteredArr.value = []
+        for (let i = 0; i < itemTitles.value.length; i++) {
+          if (itemTitles.value[i].indexOf(searchListener.value) > -1) {
+            filteredArr.value.push(itemTitles.value[i])
+          }
         }
-      }
-    }
-    const genreHandler = () => {
-      console.log(selectedGenre.value)
-      for (let i = 0; i < animeList.value.length; i++) {
-        animeList.value[i].genres.forEach(genre => {
-          if (genre === selectedGenre.value) {
-            console.log(animeList.value[i].titles.en)
-            filteredArr.value.push(animeList.value[i].titles.en)
+      } else {
+        filteredArr.value = []
+        subArr.forEach(item => {
+          if (item.indexOf(searchListener.value) > -1) {
+            filteredArr.value.push(item)
           }
         })
       }
     }
+    const genreHandler = () => {
+      console.log(selectedGenre.value)
+      if (searchListener.value === '') {
+        for (let i = 0; i < animeList.value.length; i++) {
+          animeList.value[i].genres.forEach(genre => {
+            if (genre === selectedGenre.value) {
+              filteredArr.value.push(animeList.value[i].titles.en)
+            }
+          })
+        }
+      } else {
+        for (let i = 0; i < animeList.value.length; i++) {
+          for (let j = 0; j < filteredArr.value.length; j++) {
+            if (animeList.value[i].titles.en === filteredArr.value[j]) {
+              for (let o = 0; o < animeList.value[i].genres.length; o++) {
+                if (animeList.value[i].genres[o] === selectedGenre.value) {
+                  filteredArr.value = []
+                  filteredArr.value.push(animeList.value[i].titles.en)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    const favouritesHandler = (e) => {
+      e.target.classList.add('favourites--active')
+      store.dispatch('addFavourite', e.target.getAttribute('value'))
+    }
+
+    watch(() => favouritesList.value, (list) => {
+      const favourites = document.querySelectorAll('.favourites-input')
+      favourites.forEach(f => {
+        const favouriteName = f.getAttribute('value')
+        if (list.indexOf(favouriteName) > -1) {
+          f.classList.add('favourites--active')
+        } else {
+          f.classList.remove('favourites--active')
+        }
+      })
+    })
+
     return {
       animeList,
       searchListener,
@@ -96,13 +140,14 @@ export default {
       filteredArr,
       genres,
       selectedGenre,
-      genreHandler
+      genreHandler,
+      favouritesHandler
     }
   }
 }
 </script>
 
-<style scoped>
+<style>
   *{
     margin: 0;
     padding: 0;
@@ -112,8 +157,20 @@ export default {
   max-width: 1220px;
   margin: 0 auto;
 }
+ul{
+  list-style-type: none;
+}
   .inner{
     display: flex;
     align-items: flex-start;
+  }
+  .addFavourites{
+    color: gray;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .favourites--active + .addFavourites{
+    color: #aeae0d;
   }
 </style>
